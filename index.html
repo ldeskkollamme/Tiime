@@ -1,0 +1,288 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NUMBER CHALLENGE - 2-Player Real-Time Multiplayer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: { brand: { dark: '#0B0D1B', card: '#151932', purple: '#7928CA', pink: '#FF0080', cyan: '#00DFD8', yellow: '#FDBB2D', green: '#10B981', red: '#EF4444' } }, animation: { 'ping-slow': 'ping 1.4s cubic-bezier(0,0,.2,1) infinite' } } } }
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{font-family:'Outfit',sans-serif;-webkit-tap-highlight-color:transparent}
+.font-game{font-family:'Fredoka',cursive,sans-serif}
+body{background:#0B0D1B}
+.glass{background:rgba(21,25,50,.88);backdrop-filter:blur(18px)}
+.text-gradient-fire{background:linear-gradient(135deg,#FF0080 0%,#B24BF3 45%,#00DFD8 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.card-shine{position:relative;overflow:hidden}
+.card-shine::after{content:'';position:absolute;top:0;left:0;width:60%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.07),transparent);animation:shim 3.5s linear infinite;pointer-events:none}
+@keyframes shim{0%{transform:translateX(-100%)}100%{transform:translateX(220%)}}
+.number-btn{aspect-ratio:1/1;transition:transform .18s cubic-bezier(.34,1.56,.64,1);position:relative}
+.number-btn:active{transform:scale(.92)}
+.number-btn.selected{border-color:#00DFD8!important;box-shadow:0 0 20px #00DFD8,inset 0 0 12px rgba(0,223,216,.6);transform:scale(1.08);background:linear-gradient(135deg,#7928CA,#00DFD8)!important;color:#fff!important}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-thumb{background:linear-gradient(#7928CA,#FF0080);border-radius:8px}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body class="bg-brand-dark text-slate-100 min-h-screen flex flex-col relative overflow-x-hidden">
+<div class="fixed inset-0 z-0 pointer-events-none">
+ <div class="absolute -top-32 -left-32 w-[420px] h-[420px] rounded-full bg-brand-purple/30 blur-[110px]"></div>
+ <div class="absolute top-1/3 -right-32 w-[420px] h-[420px] rounded-full bg-brand-pink/20 blur-[110px]"></div>
+ <div class="absolute bottom-0 left-1/3 w-[500px] h-[300px] rounded-full bg-brand-cyan/15 blur-[110px]"></div>
+</div>
+<header class="relative z-20 w-full max-w-5xl mx-auto px-4 py-4 flex items-center justify-between">
+ <button onclick="app.showScreen('home')" class="flex items-center gap-3 text-left">
+  <div class="w-11 h-11 rounded-2xl bg-gradient-to-tr from-brand-pink via-brand-purple to-brand-cyan flex items-center justify-center font-game font-bold text-2xl text-white shadow-lg border border-white/20">#</div>
+  <div>
+   <h1 class="text-xl font-black tracking-wider text-gradient-fire leading-none">NUMBER CHALLENGE</h1>
+   <p class="text-[10px] text-slate-400 font-bold tracking-[0.22em] uppercase mt-1">100 Levels • Realtime 1v1</p>
+  </div>
+ </button>
+ <button onclick="app.openConfigModal()" class="px-3 py-2 rounded-xl bg-slate-800/80 border border-slate-700 text-xs font-semibold flex items-center gap-2">
+  <span id="db-indicator" class="w-2 h-2 rounded-full bg-emerald-400"></span><span id="db-label" class="text-slate-300 hidden sm:inline">Firebase Live</span>
+ </button>
+</header>
+<main class="relative z-10 w-full max-w-md md:max-w-xl lg:max-w-3xl mx-auto px-4 pb-6 flex-1 flex flex-col justify-center">
+
+<!-- HOME -->
+<section id="screen-home" class="w-full flex flex-col items-center text-center space-y-5">
+ <div class="relative w-full max-w-md"><div class="absolute -inset-1 bg-gradient-to-r from-brand-pink via-brand-purple to-brand-cyan rounded-[26px] blur-xl opacity-60"></div>
+  <div class="relative glass border border-slate-700/60 p-6 md:p-8 rounded-[26px] shadow-2xl card-shine">
+   <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand-purple/25 border border-brand-purple/60 text-brand-cyan text-[11px] font-extrabold tracking-[0.18em] uppercase mb-3"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>Real-time Online Duel • 2 Players</span>
+   <h2 class="text-4xl md:text-5xl font-black font-game text-white tracking-tight leading-[.95] mb-2">NUMBER<br><span class="text-gradient-fire">CHALLENGE</span></h2>
+   <p class="text-slate-300 font-semibold mb-1">Think. Choose. Guess. Win.</p>
+   <p class="text-xs text-slate-400 mb-5">100 escalating levels • 1000 turns • 15s pressure • 1 winner. Firebase synced across real devices.</p>
+   <label for="input-player-name" class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-slate-400 block text-left ml-1">Enter Your Name</label>
+   <input id="input-player-name" type="text" maxlength="15" placeholder="e.g. MasterGamer" class="w-full bg-slate-900/90 border-2 border-slate-700 focus:border-brand-cyan focus:ring-4 focus:ring-cyan-500/20 rounded-2xl px-4 py-4 text-white font-bold text-lg placeholder-slate-500 outline-none transition">
+   <div class="flex flex-wrap justify-center gap-2 my-5">
+    <span class="chip px-3 py-1.5 rounded-full text-[11px] font-black uppercase border bg-pink-500/15 text-pink-300 border-pink-500/30">⚡ 15s Timer</span>
+    <span class="chip px-3 py-1.5 rounded-full text-[11px] font-black uppercase border bg-cyan-500/15 text-cyan-300 border-cyan-500/30">🛡️ Anti-Cheat Seal</span>
+    <span class="chip px-3 py-1.5 rounded-full text-[11px] font-black uppercase border bg-yellow-500/15 text-yellow-300 border-yellow-500/30">🏆 100 Levels</span>
+   </div>
+   <button onclick="app.handleCreateRoomClick()" class="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-brand-pink to-brand-purple text-white text-[17px] font-black tracking-wide shadow-lg shadow-pink-600/30 active:scale-[.98] transition">➕ CREATE ROOM</button>
+   <button onclick="app.showJoinModal()" class="w-full py-4 px-6 rounded-2xl bg-slate-800/90 border-2 border-slate-700 hover:border-brand-cyan py-4 text-white text-[17px] font-black tracking-wide transition active:scale-[.98] mt-3">🚪 JOIN ROOM</button>
+   <button onclick="app.startAIGame()" class="w-full py-3 rounded-2xl bg-gradient-to-r from-emerald-500/15 to-cyan-500/15 border-2 border-emerald-500/40 text-white text-[15px] font-black tracking-wide transition active:scale-[.98] mt-3">🤖 PRACTICE VS COMPUTER</button>
+   <button onclick="app.showInstructionsModal()" class="w-full mt-5 text-xs font-bold text-brand-cyan">❓ HOW TO PLAY • FIREBASE RULES</button>
+  </div>
+ </div>
+</section>
+
+<!-- LOBBY -->
+<section id="screen-lobby" class="w-full hidden flex-col items-center text-center space-y-4">
+ <div class="glass border border-slate-700/80 p-6 md:p-8 rounded-3xl shadow-2xl w-full max-w-lg card-shine">
+  <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+   <button onclick="app.leaveRoom()" class="text-xs font-bold text-slate-400 hover:text-red-400">← LEAVE</button>
+   <span class="text-xs font-black text-brand-cyan uppercase tracking-[0.2em]">🎮 Game Lobby</span><span class="w-12"></span>
+  </div>
+  <div class="my-5 p-5 rounded-2xl bg-slate-900/90 border-2 border-brand-purple/50">
+   <div class="text-[11px] uppercase font-black text-slate-400 tracking-[0.25em]">Room Code</div>
+   <div id="lobby-room-code" class="text-5xl font-black font-game tracking-[0.18em] text-brand-yellow">------</div>
+   <div class="text-[11px] text-slate-500 mt-1">Share this code — it syncs via Firebase Realtime listeners on every device.</div>
+   <button onclick="app.copyRoomCode()" class="mt-3 px-4 py-2 rounded-xl bg-brand-purple/40 border border-brand-purple/70 text-xs font-bold text-white">⧉ <span id="copy-btn-text">COPY CODE</span></button>
+  </div>
+  <div class="grid grid-cols-2 gap-3 my-4">
+   <div class="bg-slate-900/60 p-4 rounded-2xl border-2 border-brand-pink/50 relative"><span class="absolute top-2 left-2 text-[10px] font-black uppercase bg-brand-pink/20 text-brand-pink px-2 py-0.5 rounded-md">Host</span><div class="w-14 h-14 rounded-full bg-gradient-to-tr from-brand-pink to-purple-600 flex items-center justify-center text-white text-xl font-black mt-3 mb-2 border-2 border-white/20">P1</div><h4 id="lobby-p1-name" class="font-bold text-sm text-white">Waiting...</h4><span id="lobby-p1-status" class="text-[11px] font-bold text-slate-400">Online</span></div>
+   <div id="lobby-p2-card" class="bg-slate-900/60 p-4 rounded-2xl border-2 border-slate-700 relative"><span class="absolute top-2 left-2 text-[10px] font-black uppercase bg-brand-cyan/20 text-brand-cyan px-2 py-0.5 rounded-md">Guest</span><div class="w-14 h-14 rounded-full bg-gradient-to-tr from-brand-cyan to-blue-600 flex items-center justify-center text-white text-xl font-black mt-3 mb-2 border-2 border-white/20">P2</div><h4 id="lobby-p2-name" class="font-bold text-sm text-white">Waiting...</h4><span id="lobby-p2-status" class="text-[11px] font-bold text-slate-400">Waiting for opponent...</span></div>
+  </div>
+  <div id="lobby-host-controls" class="space-y-2">
+   <button id="btn-start-game" onclick="app.startGame()" disabled class="w-full py-4 rounded-2xl bg-slate-800 text-slate-500 font-black text-lg tracking-wider uppercase cursor-not-allowed">START GAME</button>
+   <button onclick="app.convertToAIBot()" class="w-full py-2.5 rounded-xl bg-slate-800/80 border border-dashed border-emerald-500/50 text-emerald-300 text-xs font-black uppercase">+ Add Computer Opponent</button>
+   <p id="lobby-msg" class="text-xs font-bold text-amber-400">Waiting for Player 2 to join… Open the code in a second tab/phone.</p>
+  </div>
+  <div id="lobby-guest-controls" class="hidden py-4 rounded-2xl bg-slate-900/40 border border-slate-800"><p class="text-sm font-bold text-brand-cyan animate-pulse">Waiting for host to start…</p></div>
+ </div>
+</section>
+
+<!-- GAME -->
+<section id="screen-game" class="w-full hidden flex-col space-y-3">
+ <div class="glass border border-slate-700/80 p-3.5 rounded-2xl shadow-xl">
+  <div class="flex items-center justify-between mb-2 gap-2">
+   <div class="flex items-center space-x-2">
+    <span class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-brand-pink to-brand-purple font-black text-white text-xs md:text-sm tracking-wider">🔥 LEVEL <span id="game-level-display">1</span>/100</span>
+    <span id="game-turn-display" class="text-[11px] font-black text-slate-200 bg-slate-800 px-2.5 py-1.5 rounded-lg border border-slate-700">Turn 1/10</span>
+   </div>
+   <div class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700"><span class="text-[11px] font-bold text-slate-400">⏱</span><span id="game-timer" class="text-sm font-black text-brand-yellow w-8 text-right">15s</span></div>
+  </div>
+  <div class="grid grid-cols-2 gap-2">
+   <div id="score-card-p1" class="p-2.5 rounded-xl bg-slate-900/90 border-2 border-brand-pink/60 flex items-center justify-between"><div><span class="text-[10px] font-black text-brand-pink tracking-widest">● PLAYER 1</span><span id="score-name-p1" class="text-xs font-black text-white block">P1</span></div><div id="score-val-p1" class="text-2xl font-black font-game text-brand-pink">0</div></div>
+   <div id="score-card-p2" class="p-2.5 rounded-xl bg-slate-900/90 border-2 border-brand-cyan/60 flex items-center justify-between"><div><span class="text-[10px] font-black text-brand-cyan tracking-widest">● PLAYER 2</span><span id="score-name-p2" class="text-xs font-black text-white block">P2</span></div><div id="score-val-p2" class="text-2xl font-black font-game text-brand-cyan">0</div></div>
+  </div>
+  <div class="mt-3">
+   <div class="flex justify-between text-[10px] font-black text-slate-400 mb-1 tracking-widest"><span>PROGRESS</span><span id="progress-percent" class="text-brand-cyan">1%</span></div>
+   <div class="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800"><div id="progress-bar-fill" class="h-full bg-gradient-to-r from-brand-pink via-brand-purple to-brand-cyan rounded-full transition-all duration-500" style="width:1%"></div></div>
+  </div>
+ </div>
+ <div id="turn-banner" class="py-3 px-4 rounded-2xl bg-gradient-to-r from-brand-purple/40 to-slate-900/90 border border-brand-purple/50 text-center shadow-lg">
+  <h3 id="turn-title" class="text-base md:text-lg font-black tracking-wide text-white font-game uppercase">YOUR TURN: CHOOSE A SECRET NUMBER</h3>
+  <p id="turn-subtitle" class="text-xs font-semibold text-slate-300 mt-0.5">Pick a number secretly.</p>
+ </div>
+ <div class="glass border border-slate-700/80 p-4 rounded-3xl shadow-2xl">
+  <div class="flex items-center justify-between mb-3">
+   <span class="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">🎯 Number Grid • <span id="grid-count-label" class="text-brand-yellow">2 numbers</span></span>
+   <span id="grid-mode-badge" class="text-[10px] font-black px-2.5 py-1 rounded-full bg-brand-pink/20 text-pink-300 border border-pink-500/40 uppercase">Secret Pick</span>
+  </div>
+  <div id="numbers-grid" class="grid grid-cols-2 gap-3 justify-items-center max-w-sm mx-auto max-h-[42vh] overflow-y-auto pr-1"></div>
+ </div>
+ <div class="mt-1 pt-3 border-t border-slate-800 flex items-center justify-between gap-3">
+  <div class="text-xs font-semibold text-slate-400">Selected: <span id="selected-number-preview" class="text-base font-black text-brand-cyan ml-1">None</span></div>
+  <button id="btn-confirm-action" onclick="app.handleConfirmNumber()" disabled class="px-5 py-3 rounded-xl bg-slate-800 text-slate-500 font-black text-[13px] uppercase tracking-wide whitespace-nowrap">Confirm</button>
+ </div>
+ <div class="flex items-center justify-between text-[11px] font-bold text-slate-400 px-3 py-2 bg-slate-900/50 rounded-xl border border-slate-800">
+  <div>✅ Correct: <span id="stats-correct" class="text-green-400 font-black">0</span></div><div>❌ Wrong: <span id="stats-wrong" class="text-red-400 font-black">0</span></div><div>🎯 Accuracy: <span id="stats-acc" class="text-brand-cyan font-black">0%</span></div>
+  <button onclick="app.leaveRoom()" class="text-slate-500 font-black text-[10px] tracking-widest">✕ QUIT</button>
+ </div>
+</section>
+
+<!-- GAME OVER -->
+<section id="screen-gameover" class="w-full hidden flex-col items-center text-center space-y-4">
+ <div class="glass border border-slate-700/80 p-6 md:p-8 rounded-3xl shadow-2xl w-full max-w-lg card-shine">
+  <span class="inline-block px-4 py-1.5 rounded-full bg-brand-yellow/15 border border-brand-yellow/50 text-brand-yellow font-black text-[11px] uppercase tracking-[0.2em] mb-3">🏁 Challenge Completed</span>
+  <h2 class="text-4xl font-black font-game text-white mb-1">GAME <span class="text-gradient-fire">OVER</span></h2>
+  <div id="gameover-winner-banner" class="my-4 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-brand-pink via-brand-purple to-brand-cyan text-white text-xl font-black uppercase">PLAYER 1 WINS!</div>
+  <div class="grid grid-cols-2 gap-3 my-5">
+   <div class="p-4 rounded-2xl bg-slate-900/80 border-2 border-brand-pink flex flex-col items-center"><span id="gameover-p1-name" class="text-xs font-bold text-brand-pink">Player 1</span><div id="gameover-p1-score" class="text-5xl font-black font-game text-white mt-1">0</div><span class="text-[10px] text-slate-400 mt-1 uppercase">Points</span></div>
+   <div class="p-4 rounded-2xl bg-slate-900/80 border-2 border-brand-cyan flex flex-col items-center"><span id="gameover-p2-name" class="text-xs font-bold text-brand-cyan">Player 2</span><div id="gameover-p2-score" class="text-5xl font-black font-game text-white mt-1">0</div><span class="text-[10px] text-slate-400 mt-1 uppercase">Points</span></div>
+  </div>
+  <div class="bg-slate-900/90 rounded-2xl p-4 border border-slate-800 space-y-2 text-xs font-bold text-slate-300 text-left">
+   <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-400">Total Levels Completed:</span><span id="gameover-levels-count" class="text-white font-black">100</span></div>
+   <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-400">Total Turns Played:</span><span id="gameover-turns-count" class="text-white font-black">1000</span></div>
+   <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-400">Your Correct Guesses:</span><span id="gameover-correct-count" class="text-green-400 font-black">0</span></div>
+   <div class="flex justify-between border-b border-slate-800 pb-1.5"><span class="text-slate-400">Your Wrong Guesses:</span><span id="gameover-wrong-count" class="text-red-400 font-black">0</span></div>
+   <div class="flex justify-between"><span class="text-slate-400">Overall Accuracy:</span><span id="gameover-accuracy" class="text-brand-cyan font-black">0%</span></div>
+  </div>
+  <div class="mt-6 space-y-2.5">
+   <button id="btn-play-again" onclick="app.requestPlayAgain()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-pink to-brand-purple text-white font-black text-base uppercase tracking-wider shadow-lg shadow-pink-500/30 active:scale-95 transition">🔁 PLAY AGAIN</button>
+   <div class="grid grid-cols-2 gap-2"><button onclick="app.leaveRoom(true)" class="py-3 rounded-xl bg-slate-800 text-[11px] font-black uppercase text-white">+ New Room</button><button onclick="app.showScreen('home')" class="py-3 rounded-xl bg-slate-800 text-[11px] font-black uppercase text-white">Home</button></div>
+  </div>
+ </div>
+</section>
+</main>
+
+<!-- COUNTDOWN modal -->
+<div id="modal-countdown" class="fixed inset-0 z-50 bg-[rgba(11,13,27,.93)] backdrop-blur-md hidden flex-col items-center justify-center p-4"><div class="text-center space-y-2"><span class="inline-block px-4 py-1 rounded-full bg-brand-cyan/15 border border-brand-cyan/40 text-brand-cyan text-xs font-black tracking-[0.25em] uppercase">Get Ready</span><div id="countdown-level-title" class="text-3xl md:text-5xl font-black font-game text-brand-cyan uppercase">LEVEL 1</div><div id="countdown-sub" class="text-xs font-bold text-slate-400 uppercase tracking-widest">Turn 1</div><div id="countdown-number" class="text-8xl md:text-9xl font-black font-game text-gradient-fire">3</div></div></div>
+<!-- RESULT modal -->
+<div id="modal-result" class="fixed inset-0 z-40 hidden flex-col items-center justify-center p-4 bg-[rgba(11,13,27,.78)]"><div id="result-box" class="pop-in p-6 rounded-3xl border-2 text-center max-w-sm w-full" style="background:#151932"><div id="result-icon" class="w-16 h-16 mx-auto rounded-full bg-green-500/20 border-2 border-green-500 text-3xl flex items-center justify-center mb-3">🎯</div><h3 id="result-title" class="text-2xl font-black font-game mb-1">CORRECT!</h3><p id="result-desc" class="text-sm font-bold text-slate-300 mb-2">+1 Point!</p><div class="text-xs font-extrabold uppercase text-brand-yellow bg-slate-900/80 rounded-xl py-2 px-3 border border-yellow-500/20">The Secret Number Was: <span id="result-secret-num" class="text-base text-white underline ml-1">42</span></div></div></div>
+<!-- JOIN modal -->
+<div id="modal-join" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80"><div class="glass border border-slate-700 p-6 rounded-3xl max-w-sm w-full text-center relative pop-in"><button onclick="app.closeJoinModal()" aria-label="Close" class="absolute top-4 right-4 text-slate-400 text-xl">✕</button><h3 class="text-xl font-black font-game uppercase mb-1">Enter Room Code</h3><p class="text-xs text-slate-400 font-semibold mb-4">Enter the 6-digit code provided by the host.</p><input id="input-join-code" type="text" maxlength="6" inputmode="numeric" placeholder="123456" class="w-full text-center text-3xl tracking-[0.3em] font-black font-game bg-slate-900 border-2 border-slate-700 focus:border-brand-cyan rounded-2xl py-3 text-brand-yellow outline-none mb-3 uppercase"><div id="join-error-msg" class="text-xs font-bold text-red-400 mb-3 hidden"></div><button onclick="app.handleJoinRoomClick()" class="w-full py-4 rounded-2xl bg-gradient-to-r from-brand-cyan to-blue-600 text-white font-black text-base uppercase tracking-wider shadow-lg active:scale-95 transition">JOIN NOW</button><p class="text-[11px] text-slate-500 mt-3">Realtime Firebase listeners sync both devices instantly.</p></div></div>
+<!-- INSTRUCTIONS -->
+<div id="modal-instructions" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/80"><div class="glass border border-slate-700 p-6 md:p-7 rounded-3xl max-w-md w-full text-left relative max-h-[86vh] overflow-y-auto pop-in"><button onclick="app.closeInstructionsModal()" aria-label="Close" class="absolute top-4 right-4 text-slate-400 text-xl">✕</button><h3 class="text-xl font-black font-game uppercase mb-4">❓ How To Play</h3><ol class="space-y-3 text-[13px] font-semibold text-slate-300 list-decimal list-inside"><li>Enter a name; host creates a 6-digit room, friend joins from their phone/browser — pure Firebase Realtime Database. No localStorage as the database.</li><li>100 levels × 10 turns = 1000 turns. Level 1 has 2 circles, growing to 101 at Level 100.</li><li>Odd turns: P1 secretly picks → P2 guesses. Correct = P2 +1. Even turns swap roles.</li><li>15s timer per pick/guess; timeout auto-picks, 0 pts for missed guess. Anti-cheat: secret sealed until reveal.</li><li>Highest score after Level 100 wins. Highest overall accuracy reflected live.</li></ol><div class="mt-4 p-3 rounded-xl bg-gradient-to-r from-brand-purple/20 to-brand-pink/20 border border-purple-500/30 text-[12px] font-bold text-slate-200">💡 Solo? Practice vs Computer.</div><button onclick="app.closeInstructionsModal()" class="w-full mt-4 py-3 rounded-xl bg-slate-800 text-white font-black text-xs uppercase tracking-wider">GOT IT, LET'S PLAY!</button></div></div>
+<!-- CONFIG -->
+<div id="modal-firebase-config" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/85"><div class="glass border border-slate-700 p-6 rounded-3xl max-w-lg w-full text-left relative max-h-[88vh] overflow-y-auto pop-in"><button onclick="app.closeConfigModal()" aria-label="Close" class="absolute top-4 right-4 text-slate-400 text-xl">✕</button><h3 class="text-xl font-black font-game uppercase mb-1">Firebase Setup</h3><p class="text-xs text-slate-400 mb-4">Anonymous Auth + Realtime Database rules: rooms: { ".read": true, ".write": true }. Leave demo behind for worldwide sync.</p><div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[11px] font-bold text-amber-200 mb-4">Current: <span id="config-mode-label">Live Firebase</span> — no localStorage storage used for game state.</div><textarea id="input-custom-firebase-config" rows="6" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 font-mono text-[11px] text-cyan-300 focus:border-brand-cyan outline-none"></textarea><div class="flex gap-2 mt-3"><button onclick="app.saveFirebaseConfig()" class="flex-1 py-3 rounded-xl bg-brand-cyan text-brand-dark font-black text-xs uppercase">Apply & Reconnect</button><button onclick="app.loadDemoConfig()" class="px-3 py-3 rounded-xl bg-slate-800 border border-slate-700 text-xs font-bold text-slate-300">Demo</button></div><pre class="bg-slate-950 p-3 rounded-xl text-[10px] font-mono text-slate-300 overflow-x-auto border border-slate-800 mt-4">{ "rules": { "rooms": { "$code": { ".read": true, ".write": true } } } }</pre></div></div>
+
+<footer class="relative z-10 text-center py-3 text-[11px] font-semibold text-slate-500">NUMBER CHALLENGE © 2025 • Firebase Auth + Realtime Database • Responsive for Android / iPhone / Tablet / Desktop</footer>
+
+<script>
+class NumberChallengeApp {
+ constructor(){
+  this.playerId=localStorage.getItem('nc_player_id')||('usr_'+Math.random().toString(36).slice(2,9));localStorage.setItem('nc_player_id',this.playerId);
+  this.playerName=localStorage.getItem('nc_player_name')||'';
+  this.roomCode=null;this.isHost=false;this.playerRole=null;this.roomRef=null;this.currentRoomData=null;
+  this.selectedLocalNumber=null;this.timerInterval=null;this.countdownTimer=null;this.stats={correct:0,wrong:0};
+  this.isAIMode=false;this.lastStateKey='';this.resultKey='';this.aiLock='';this.gameOverCelebrated='';
+  const cfg={apiKey:'YOUR_FIREBASE_API_KEY',authDomain:'your-app.firebaseapp.com',databaseURL:'https://your-app-default-rtdb.firebaseio.com',projectId:'your-app',storageBucket:'your-app.appspot.com',messagingSenderId:'1234567890',appId:'1:123:web:abc'};
+  const stored=localStorage.getItem('nc_firebase_config');
+  this.firebaseConfig=stored?JSON.parse(stored):cfg;
+  this.init();
+ }
+ init(){
+  if(this.playerName)document.getElementById('input-player-name').value=this.playerName;
+  document.getElementById('input-join-code');
+  try{
+   if(!firebase.apps.length)firebase.initializeApp(this.firebaseConfig);
+   this.db=firebase.database();
+   const auth=firebase.auth();
+   auth.signInAnonymously().catch(()=>{});
+   document.getElementById('db-indicator').className='w-2 h-2 rounded-full bg-emerald-400';
+   document.getElementById('db-label').textContent='Firebase Live';
+  }catch(e){document.getElementById('db-indicator').className='w-2 h-2 rounded-full bg-amber-400';document.getElementById('db-label').textContent='Config Needed';}
+ }
+ showScreen(n){['home','lobby','game','gameover'].forEach(x=>{const el=document.getElementById('screen-'+x);const show=x===n;el.classList.toggle('hidden',!show);el.classList.toggle('flex',show);if(x==='game'&&show)el.classList.add('flex-col');});window.scrollTo({top:0,behavior:'smooth'});}
+ showScreenSilent(n){this.showScreen(n);}
+ gen(level){const count=level+1;const set=new Set();const range=Math.max(100,count*3);let g=0;while(set.size<count&&g<5000){set.add(Math.floor(Math.random()*range)+1);g++;}return [...set].sort((a,b)=>a-b);}
+ code(){return String(Math.floor(100000+Math.random()*900000));}
+ name(){return document.getElementById('input-player-name').value.trim();}
+ handleCreateRoomClick(){const n=this.name();if(!n){alert('Please enter your name first!');return;}this.playerName=n;localStorage.setItem('nc_player_name',n);this.createRoom(this.code());}
+ showJoinModal(){const n=this.name();if(!n){alert('Please enter your name first!');document.getElementById('input-player-name').focus();return;}this.playerName=n;localStorage.setItem('nc_player_name',n);document.getElementById('modal-join').classList.remove('hidden');document.getElementById('modal-join').classList.add('flex');}
+ closeJoinModal(){document.getElementById('modal-join').classList.add('hidden');document.getElementById('modal-join').classList.remove('flex');document.getElementById('join-error-msg').classList.add('hidden');}
+ async getRoom(c){const s=await this.db.ref('rooms/'+c).once('value');return s.val();}
+ async saveRoom(c,d){this.currentRoomData=JSON.parse(JSON.stringify(d));await this.db.ref('rooms/'+c).set(d);}
+ listen(c){if(this.roomRef){try{this.roomRef.off();}catch(e){}}this.roomRef=this.db.ref('rooms/'+c);this.roomRef.on('value',snap=>{const d=snap.val();if(d)this.handleUpdate(d);});}
+ async createRoom(c){this.roomCode=c;this.isHost=true;this.playerRole='player1';this.isAIMode=false;this.stats={correct:0,wrong:0};const d={roomCode:c,hostId:this.playerId,status:'WAITING',players:{player1:{id:this.playerId,name:this.playerName,online:true,score:0,readyForRematch:false},player2:null},game:{level:1,state:'WAITING',turn:1,numbers:this.gen(1),secretNumber:null,guess:null,result:null,timerEnd:0}};await this.saveRoom(c,d);this.listen(c);this.showScreen('lobby');this.lobbyUI(d);history.replaceState(null,'','#'+c);}
+ async handleJoinRoomClick(){const c=document.getElementById('input-join-code').value.trim();const err=document.getElementById('join-error-msg');if(!/^\d{6}$/.test(c)){err.textContent='Enter a valid 6-digit code.';err.classList.remove('hidden');return;}try{const d=await this.getRoom(c);if(!d){err.textContent='Room not found.';err.classList.remove('hidden');return;}const p1=d.players.player1,p2=d.players.player2;const mineMe=p1&&p1.id===this.playerId,mineP2=p2&&p2.id===this.playerId;if(!mineMe&&!mineP2){if(p2){err.textContent='Room is full (2/2).';err.classList.remove('hidden');return;}d.players.player2={id:this.playerId,name:this.playerName,online:true,score:0,readyForRematch:false};d.status='READY';}this.roomCode=c;this.isHost=!!mineMe;this.playerRole=mineMe?'player1':'player2';this.isAIMode=false;this.stats={correct:0,wrong:0};await this.saveRoom(c,d);this.listen(c);this.closeJoinModal();this.showScreen('lobby');this.lobbyUI(d);history.replaceState(null,'','#'+c);}catch(e){err.textContent='Error: '+e.message;err.classList.remove('hidden');}}
+ async startAIGame(){const n=this.name()||'You';this.playerName=n;this.roomCode=this.code();this.isHost=true;this.playerRole='player1';this.isAIMode=true;this.stats={correct:0,wrong:0};const d={roomCode:this.roomCode,hostId:this.playerId,status:'PLAYING',isAIMode:true,players:{player1:{id:this.playerId,name:n,online:true,score:0,readyForRematch:false},player2:{id:'AI_BOT',name:'🤖 Computer',online:true,score:0,readyForRematch:false,isBot:true}},game:{level:1,state:'LEVEL_START',turn:1,numbers:this.gen(1),secretNumber:null,guess:null,result:null,timerEnd:Date.now()+3800}};this.currentRoomData=d;await this.db.ref('rooms/'+this.roomCode).set(d);this.showScreen('game');this.handleUpdate(d);}
+ async convertToAIBot(){if(!this.currentRoomData||!this.isHost)return;const d=this.currentRoomData;d.isAIMode=true;this.isAIMode=true;d.players.player2={id:'AI_BOT',name:'🤖 Computer',online:true,score:0,readyForRematch:false,isBot:true};d.status='READY';await this.saveRoom(this.roomCode,d);setTimeout(()=>this.startGame(),800);}
+ copyRoomCode(){if(!this.roomCode)return;const b=document.getElementById('copy-btn-text');if(navigator.clipboard)navigator.clipboard.writeText(this.roomCode).catch(()=>{});b.textContent='COPIED!';setTimeout(()=>b.textContent='COPY CODE',1800);}
+ lobbyUI(d){document.getElementById('lobby-room-code').textContent=d.roomCode||'------';const p1=d.players.player1,p2=d.players.player2;document.getElementById('lobby-p1-name').textContent=p1?p1.name:'Waiting...';document.getElementById('lobby-p1-status').textContent=p1?(p1.online?'Online':'Disconnected'):'';document.getElementById('lobby-p2-name').textContent=p2?p2.name:'Waiting...';document.getElementById('lobby-p2-status').textContent=p2?(p2.isBot?'AI Ready • Online':(p2.online?'Online':'Disconnected')):'Waiting for opponent...';const sb=document.getElementById('btn-start-game'),msg=document.getElementById('lobby-msg');if(this.isHost){document.getElementById('lobby-host-controls').classList.remove('hidden');document.getElementById('lobby-guest-controls').classList.add('hidden');if(p1&&p2){sb.disabled=false;sb.className='w-full py-4 rounded-2xl bg-gradient-to-r from-brand-pink to-brand-purple text-white font-black text-lg tracking-wider uppercase shadow-lg active:scale-95 transition';msg.textContent='Both connected! Press START to begin Level 1.';msg.className='text-xs font-bold text-green-400';}else{sb.disabled=true;sb.className='w-full py-4 rounded-2xl bg-slate-800 text-slate-500 font-black text-lg tracking-wider uppercase cursor-not-allowed';msg.textContent='Waiting for Player 2 — share the code, or add a bot.';msg.className='text-xs font-bold text-amber-400';}}else{document.getElementById('lobby-host-controls').classList.add('hidden');document.getElementById('lobby-guest-controls').classList.remove('hidden');}}
+ async startGame(){if(!this.isHost)return;const d=this.currentRoomData;d.status='PLAYING';d.game={level:1,state:'LEVEL_START',turn:1,numbers:this.gen(1),secretNumber:null,guess:null,result:null,timerEnd:Date.now()+3800};await this.saveRoom(this.roomCode,d);}
+ async transition(next,sec=15){if(!this.isHost)return;const d=this.currentRoomData;d.game.state=next;d.game.timerEnd=Date.now()+sec*1000;d.game.guess=null;await this.saveRoom(this.roomCode,d);}
+ handleUpdate(data){const prev=this.currentRoomData;this.currentRoomData=JSON.parse(JSON.stringify(data));if(data.isAIMode)this.isAIMode=true;if(data.players.player1&&data.players.player1.id===this.playerId){this.playerRole='player1';this.isHost=data.hostId===this.playerId||this.isAIMode;}else if(data.players.player2&&data.players.player2.id===this.playerId){this.playerRole='player2';this.isHost=false;}
+  if(data.players.player1?.readyForRematch&&data.players.player2?.readyForRematch&&this.isHost){this.resetLevel();return;}
+  if(data.status==='WAITING'||data.status==='READY'){this.showScreenSilent('lobby');this.lobbyUI(data);}
+  else if(data.status==='GAME_OVER'){this.gameOverUI(data);}
+  else{this.gameUI(data,prev);}}
+ gameUI(d){this.showScreenSilent('game');document.getElementById('game-level-display').textContent=d.game.level;document.getElementById('game-turn-display').textContent='Turn '+d.game.turn+'/10';const p=Math.max(1,Math.round(d.game.level));document.getElementById('progress-percent').textContent=p+'%';document.getElementById('progress-bar-fill').style.width=p+'%';
+  document.getElementById('score-name-p1').textContent=d.players.player1?d.players.player1.name:'P1';document.getElementById('score-val-p1').textContent=d.players.player1?d.players.player1.score:0;
+  document.getElementById('score-name-p2').textContent=d.players.player2?d.players.player2.name:'P2';document.getElementById('score-val-p2').textContent=d.players.player2?d.players.player2.score:0;
+  const t=this.stats.correct+this.stats.wrong;document.getElementById('stats-correct').textContent=this.stats.correct;document.getElementById('stats-wrong').textContent=this.stats.wrong;document.getElementById('stats-acc').textContent=(t?Math.round(this.stats.correct/t*100):0)+'%';
+  const key=d.game.level+'-'+d.game.turn+'-'+d.game.state;if(key!==this.lastStateKey){this.lastStateKey=key;this.selectedLocalNumber=null;document.getElementById('selected-number-preview').textContent='None';}
+  if(d.game.state==='LEVEL_START')this.countdown(d);
+  else if(d.game.state==='PLAYER1_SELECTING'||d.game.state==='PLAYER2_SELECTING')this.renderSelect(d);
+  else if(d.game.state==='PLAYER1_GUESSING'||d.game.state==='PLAYER2_GUESSING')this.renderGuess(d);
+  else if(d.game.state==='RESULT')this.renderResult(d);
+  if(this.isAIMode)this.ai(d);}
+ countdown(d){const m=document.getElementById('modal-countdown');m.classList.remove('hidden');m.classList.add('flex');document.getElementById('countdown-level-title').textContent='LEVEL '+d.game.level;document.getElementById('countdown-sub').textContent='Turn '+d.game.turn+' • '+(d.game.turn%2!==0?'P1 hides • P2 seeks':'P2 hides • P1 seeks')+' • '+d.game.numbers.length+' numbers';
+  if(this.countdownTimer)clearInterval(this.countdownTimer);let c=3;const el=document.getElementById('countdown-number');el.textContent=c;this.countdownTimer=setInterval(()=>{c--;if(c>0){el.textContent=c;}else if(c===0){el.textContent='GO!';clearInterval(this.countdownTimer);this.countdownTimer=null;setTimeout(()=>{m.classList.add('hidden');m.classList.remove('flex');if(this.isHost)this.transition(d.game.turn%2!==0?'PLAYER1_SELECTING':'PLAYER2_SELECTING',15);},650);}},850);}
+ renderSelect(d){this.hideCountdown();const mine=(d.game.state==='PLAYER1_SELECTING'&&this.playerRole==='player1')||(d.game.state==='PLAYER2_SELECTING'&&this.playerRole==='player2');
+  this.timer(d.game.timerEnd,()=>this.timeout('SELECT'));const T=document.getElementById('turn-title'),S=document.getElementById('turn-subtitle'),btn=document.getElementById('btn-confirm-action'),bd=document.getElementById('grid-mode-badge');bd.textContent='🔒 Secret Pick';
+  T.textContent=mine?'YOUR TURN: CHOOSE A SECRET NUMBER':'OPPONENT IS CHOOSING…';S.textContent=mine?('Level '+d.game.level+' • Pick secretly from '+d.game.numbers.length+' numbers.'):'Waiting for '+(this.playerRole==='player1'?(d.players.player2?.name||'P2'):(d.players.player1.name))+' to lock the secret.';
+  btn.textContent=mine?'🔒 CONFIRM NUMBER':'WAIT…';this.styleBtn(btn,mine&&this.selectedLocalNumber!==null,mine,'SELECT');this.grid(d.game.numbers,mine,'SELECT');}
+ renderGuess(d){this.hideCountdown();const mine=(d.game.state==='PLAYER1_GUESSING'&&this.playerRole==='player1')||(d.game.state==='PLAYER2_GUESSING'&&this.playerRole==='player2');
+  this.timer(d.game.timerEnd,()=>this.timeout('GUESS'));const T=document.getElementById('turn-title'),S=document.getElementById('turn-subtitle'),btn=document.getElementById('btn-confirm-action'),bd=document.getElementById('grid-mode-badge');bd.textContent='🔍 Guess Mode';
+  T.textContent=mine?'FIND THE NUMBER! 🎯':'OPPONENT IS GUESSING…';S.textContent=mine?'Opponent locked their secret. Tap your guess & confirm — +1 if correct!':'Waiting for the guess…';
+  btn.textContent=mine?'🎯 CONFIRM GUESS':'WAIT…';this.styleBtn(btn,mine&&this.selectedLocalNumber!==null,mine,'GUESS');this.grid(d.game.numbers,mine,'GUESS');}
+ styleBtn(btn,en,mine,mode){if(!mine){btn.disabled=true;btn.className='px-5 py-3 rounded-xl bg-slate-800 text-slate-500 font-black text-[13px] uppercase whitespace-nowrap cursor-not-allowed';return;}btn.disabled=!en;btn.className=en?('px-5 py-3 rounded-xl text-white font-black text-[13px] uppercase whitespace-nowrap active:scale-95 transition '+(mode==='SELECT'?'bg-gradient-to-r from-brand-pink to-brand-purple shadow-lg shadow-pink-500/40':'bg-gradient-to-r from-brand-cyan to-blue-600 shadow-lg shadow-cyan-500/40')):'px-5 py-3 rounded-xl bg-slate-800 text-slate-500 font-black text-[13px] uppercase whitespace-nowrap cursor-not-allowed';}
+ grid(list,interactive,mode){const g=document.getElementById('numbers-grid');g.innerHTML='';document.getElementById('grid-count-label').textContent=list.length+' numbers';const n=list.length;g.className='grid '+(n<=6?'grid-cols-2 sm:grid-cols-3 gap-3 max-w-sm':n<=20?'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2.5':n<=50?'grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2':'grid-cols-5 sm:grid-cols-7 md:grid-cols-10 gap-1.5')+' justify-items-center max-h-[42vh] overflow-y-auto max-w-lg mx-auto pr-1';
+  list.forEach(num=>{const b=document.createElement('button');const sel=this.selectedLocalNumber===num;b.className='number-btn w-full min-w-[42px] min-h-[42px] rounded-2xl font-game font-bold flex items-center justify-center border-2 transition '+(sel?'selected border-brand-cyan':'bg-slate-900/90 border-slate-700/80 text-slate-200 hover:border-brand-purple')+(interactive?' cursor-pointer':' opacity-60 cursor-not-allowed')+(n>50?' text-[12px] !min-w-[36px] !min-h-[36px] !rounded-xl':' text-sm md:text-base');b.textContent=num;if(!interactive)b.disabled=true;if(interactive)b.onclick=()=>{this.selectedLocalNumber=num;document.getElementById('selected-number-preview').textContent=num;this.grid(list,interactive,mode);this.styleBtn(document.getElementById('btn-confirm-action'),true,true,mode);};g.appendChild(b);});}
+ async handleConfirmNumber(){const num=this.selectedLocalNumber;if(num===null||!this.currentRoomData)return;const d=this.currentRoomData;this.selectedLocalNumber=null;document.getElementById('selected-number-preview').textContent='None';document.getElementById('btn-confirm-action').disabled=true;
+  if((d.game.state==='PLAYER1_SELECTING'&&this.playerRole==='player1')||(d.game.state==='PLAYER2_SELECTING'&&this.playerRole==='player2')){d.game.secretNumber=num;d.game.state=d.game.turn%2!==0?'PLAYER2_GUESSING':'PLAYER1_GUESSING';d.game.timerEnd=Date.now()+15000;await this.saveRoom(this.roomCode,d);}
+  else if((d.game.state==='PLAYER1_GUESSING'&&this.playerRole==='player1')||(d.game.state==='PLAYER2_GUESSING'&&this.playerRole==='player2')){await this.resolve(num,this.playerRole);}}
+ async resolve(guess,role){const d=this.currentRoomData;if(!d||d.game.state==='RESULT')return;const correct=guess!==null&&guess===d.game.secretNumber;if(correct){if(role==='player1')d.players.player1.score++;else d.players.player2.score++;}if(role===this.playerRole){if(correct)this.stats.correct++;else this.stats.wrong++;}d.game.guess=guess;d.game.result={guesser:role,isCorrect:correct,secretNumber:d.game.secretNumber,guessNumber:guess};d.game.state='RESULT';d.game.timerEnd=Date.now()+4000;await this.saveRoom(this.roomCode,d);}
+ renderResult(d){const r=d.game.result;if(!r)return;const key=d.game.level+'-'+d.game.turn+'-'+(r.guessNumber??'x')+'-'+(r.secretNumber??'x');const m=document.getElementById('modal-result');m.classList.remove('hidden');m.classList.add('flex');document.getElementById('result-secret-num').textContent=r.secretNumber??'—';
+  const box=document.getElementById('result-box'),ti=document.getElementById('result-title'),de=document.getElementById('result-desc'),ic=document.getElementById('result-icon');
+  if(this.resultKey!==key){this.resultKey=key;const name=r.guesser==='player1'?(d.players.player1?.name||'P1'):(d.players.player2?.name||'P2');if(r.isCorrect){ti.textContent='CORRECT! +1 POINT';ti.className='text-2xl font-black font-game text-green-400 mb-1';de.textContent=name+' nailed it!';ic.textContent='🎯';ic.className='w-16 h-16 mx-auto rounded-full bg-green-500/20 border-2 border-green-500 text-3xl flex items-center justify-center mb-3';box.style.borderColor='rgba(16,185,129,.8)';if(window.confetti)confetti({particleCount:45,spread:65,origin:{y:.6}});}else{ti.textContent='WRONG! 0 POINTS';ti.className='text-2xl font-black font-game text-red-400 mb-1';de.textContent=name+' guessed '+(r.guessNumber??'timeout')+'.';ic.textContent='💥';ic.className='w-16 h-16 mx-auto rounded-full bg-red-500/20 border-2 border-red-500 text-3xl flex items-center justify-center mb-3';box.style.borderColor='rgba(239,68,68,.8)';}
+   if(this.isHost){setTimeout(async()=>{m.classList.add('hidden');m.classList.remove('flex');await this.advance();},3500);}else{setTimeout(()=>{m.classList.add('hidden');m.classList.remove('flex');},3500);}}
+  if(this.timerInterval)clearInterval(this.timerInterval);document.getElementById('game-timer').textContent='--';}
+ async advance(){if(!this.isHost)return;const d=this.currentRoomData;if(!d||d.game.state!=='RESULT')return;
+  if(d.game.turn<10){d.game.turn++;d.game.secretNumber=null;d.game.guess=null;d.game.result=null;d.game.state=d.game.turn%2!==0?'PLAYER1_SELECTING':'PLAYER2_SELECTING';d.game.timerEnd=Date.now()+15000;await this.saveRoom(this.roomCode,d);}
+  else if(d.game.level<100){const nl=d.game.level+1;d.game.level=nl;d.game.turn=1;d.game.numbers=this.gen(nl);d.game.secretNumber=null;d.game.guess=null;d.game.result=null;d.game.state='LEVEL_START';d.game.timerEnd=Date.now()+3800;await this.saveRoom(this.roomCode,d);}
+  else{d.status='GAME_OVER';d.game.state='GAMEOVER';await this.saveRoom(this.roomCode,d);}}
+ async timeout(ctx){if(!this.isHost)return;const d=this.currentRoomData;if(!d||d.status==='GAME_OVER'||d.game.state==='RESULT')return;if(ctx==='SELECT'&&(d.game.state==='PLAYER1_SELECTING'||d.game.state==='PLAYER2_SELECTING')){d.game.secretNumber=d.game.numbers[0];d.game.state=d.game.turn%2!==0?'PLAYER2_GUESSING':'PLAYER1_GUESSING';d.game.timerEnd=Date.now()+15000;await this.saveRoom(this.roomCode,d);}else if(ctx==='GUESS'&&(d.game.state==='PLAYER1_GUESSING'||d.game.state==='PLAYER2_GUESSING')){const guesser=d.game.turn%2!==0?'player2':'player1';await this.resolve(null,guesser);}}
+ timer(end,onTO){if(this.timerInterval)clearInterval(this.timerInterval);const upd=()=>{const rem=Math.max(0,Math.ceil((end-Date.now())/1000));const el=document.getElementById('game-timer');el.textContent=rem+'s';el.className='text-sm font-black w-8 text-right '+(rem<=5?'text-red-400 animate-pulse':'text-brand-yellow');if(rem===0){clearInterval(this.timerInterval);this.timerInterval=null;if(onTO)onTO();}};upd();this.timerInterval=setInterval(upd,500);}
+ hideCountdown(){document.getElementById('modal-countdown').classList.add('hidden');document.getElementById('modal-countdown').classList.remove('flex');if(this.countdownTimer){clearInterval(this.countdownTimer);this.countdownTimer=null;}}
+ ai(d){const key=d.game.level+'-'+d.game.turn+'-'+d.game.state;if(this.aiLock===key)return;
+  if(d.game.state==='PLAYER2_SELECTING'){this.aiLock=key;setTimeout(async()=>{if(!this.currentRoomData||this.currentRoomData.game.state!=='PLAYER2_SELECTING')return;const nums=this.currentRoomData.game.numbers;this.currentRoomData.game.secretNumber=nums[Math.floor(Math.random()*nums.length)];this.currentRoomData.game.state='PLAYER1_GUESSING';this.currentRoomData.game.timerEnd=Date.now()+15000;await this.saveRoom(this.roomCode,this.currentRoomData);},1300);}
+  else if(d.game.state==='PLAYER2_GUESSING'){this.aiLock=key;setTimeout(async()=>{if(!this.currentRoomData||this.currentRoomData.game.state!=='PLAYER2_GUESSING')return;const nums=this.currentRoomData.game.numbers;const guess=nums[Math.floor(Math.random()*nums.length)];await this.resolve(guess,'player2');},1700);}}
+ gameOverUI(d){this.showScreenSilent('gameover');this.hideCountdown();const m=document.getElementById('modal-result');m.classList.add('hidden');m.classList.remove('flex');if(this.timerInterval)clearInterval(this.timerInterval);
+  const s1=d.players.player1?.score||0,s2=d.players.player2?.score||0;document.getElementById('gameover-p1-name').textContent=d.players.player1?.name||'P1';document.getElementById('gameover-p1-score').textContent=s1;document.getElementById('gameover-p2-name').textContent=d.players.player2?.name||'P2';document.getElementById('gameover-p2-score').textContent=s2;
+  const wb=document.getElementById('gameover-winner-banner');wb.textContent=s1>s2?('🏆 '+(d.players.player1.name).toUpperCase()+' WINS!'):s2>s1?('🏆 '+(d.players.player2.name).toUpperCase()+' WINS!'):'🤝 IT\u2019S A DRAW!';
+  document.getElementById('gameover-levels-count').textContent='100 Levels';document.getElementById('gameover-turns-count').textContent='1000 Turns';document.getElementById('gameover-correct-count').textContent=this.stats.correct;document.getElementById('gameover-wrong-count').textContent=this.stats.wrong;const tt=this.stats.correct+this.stats.wrong;document.getElementById('gameover-accuracy').textContent=(tt?Math.round(this.stats.correct/tt*100):0)+'%';
+  const ck=this.roomCode+'-over';if(this.gameOverCelebrated!==ck){this.gameOverCelebrated=ck;if(window.confetti){confetti({particleCount:120,spread:100,origin:{y:.4}});}}
+  const btn=document.getElementById('btn-play-again');const me=d.players[this.playerRole];btn.textContent=me?.readyForRematch?'WAITING FOR OPPONENT…':'🔁 PLAY AGAIN';btn.disabled=!!me?.readyForRematch;}
+ async requestPlayAgain(){if(!this.currentRoomData)return;const d=this.currentRoomData;const my=this.playerRole;if(d.players[my])d.players[my].readyForRematch=true;if(this.isAIMode){await this.resetLevel();return;}if(d.players.player1?.readyForRematch&&d.players.player2?.readyForRematch&&this.isHost){await this.resetLevel();return;}await this.saveRoom(this.roomCode,d);}
+ async resetLevel(){const d=this.currentRoomData;d.players.player1.score=0;d.players.player1.readyForRematch=false;if(d.players.player2){d.players.player2.score=0;d.players.player2.readyForRematch=false;}d.status='PLAYING';d.game={level:1,state:'LEVEL_START',turn:1,numbers:this.gen(1),secretNumber:null,guess:null,result:null,timerEnd:Date.now()+3800};this.stats={correct:0,wrong:0};this.lastStateKey='';this.resultKey='';this.aiLock='';this.gameOverCelebrated='';await this.saveRoom(this.roomCode,d);}
+ openConfigModal(){document.getElementById('input-custom-firebase-config').value=JSON.stringify(this.firebaseConfig,null,2);document.getElementById('modal-firebase-config').classList.remove('hidden');document.getElementById('modal-firebase-config').classList.add('flex');}
+ closeConfigModal(){document.getElementById('modal-firebase-config').classList.add('hidden');document.getElementById('modal-firebase-config').classList.remove('flex');}
+ saveFirebaseConfig(){try{const p=JSON.parse(document.getElementById('input-custom-firebase-config').value);localStorage.setItem('nc_firebase_config',JSON.stringify(p));location.reload();}catch(e){alert('Invalid JSON.');}}
+ loadDemoConfig(){localStorage.removeItem('nc_firebase_config');location.reload();}
+ showInstructionsModal(){document.getElementById('modal-instructions').classList.remove('hidden');document.getElementById('modal-instructions').classList.add('flex');}
+ closeInstructionsModal(){document.getElementById('modal-instructions').classList.add('hidden');document.getElementById('modal-instructions').classList.remove('flex');}
+ leaveRoom(createNew){try{if(this.roomRef)this.roomRef.off();}catch(e){}this.roomRef=null;if(this.timerInterval)clearInterval(this.timerInterval);this.hideCountdown();document.getElementById('modal-result').classList.add('hidden');document.getElementById('modal-result').classList.remove('flex');this.roomCode=null;this.currentRoomData=null;this.isAIMode=false;this.lastStateKey='';this.resultKey='';this.aiLock='';this.gameOverCelebrated='';this.selectedLocalNumber=null;this.showScreen('home');if(createNew)setTimeout(()=>this.handleCreateRoomClick(),300);}
+}
+window.app=new NumberChallengeApp();
+</script>
+</body>
+</html>
